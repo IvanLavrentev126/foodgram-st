@@ -119,7 +119,6 @@ REST_FRAMEWORK = {
     ],
     'PAGE_SIZE': 100,
     'DEFAULT_FILTER_BACKENDS': ['django_filters.rest_framework.DjangoFilterBackend'],
-    # 'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.LimitOffsetPagination'
 }
 
 APPEND_SLASH = False
@@ -140,4 +139,8 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-AUTH_USER_MODEL = "app.CustomUser"
+AUTH_USER_MODEL = "app.User"
+
+MIN_TIME = 1
+
+MAX_TIME = 32000
