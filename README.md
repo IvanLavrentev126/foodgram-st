@@ -28,6 +28,8 @@ Foodgram - это веб-приложение, которое позволяет
 git clone https://github.com/IvanLavrentev126/foodgram-st.git
 cd foodgram-st
 ```
+- Перейдите в директорию backend и переименуйте `env.example -> .env.example`:
+
 - Перейдите в директорию infra и запустите контейнеры:
 ```bash
 cd infra
