@@ -2,7 +2,13 @@ from django.contrib import admin
 from django.contrib.auth import get_user_model
 from django.contrib.auth.admin import UserAdmin
 
-from app.models import Ingredient, Recipe, RecipeIngredient, FavoriteRelation, ShoppingCartRelation
+from app.models import (
+    FavoriteRelation,
+    Ingredient,
+    Recipe,
+    RecipeIngredient,
+    ShoppingCartRelation
+)
 
 User = get_user_model()
 
@@ -34,12 +40,11 @@ class RecipeIngredientInline(admin.TabularInline):
 class RecipeAdmin(admin.ModelAdmin):
     list_display = ('name', 'author', 'cooking_time', 'pub_date', 'favorites_count')
     search_fields = ('name', 'author__username')
-    list_filter = ('pub_date',)
     inlines = (RecipeIngredientInline,)
     readonly_fields = ('pub_date', 'favorites_count')
 
     def favorites_count(self, obj):
-        return obj.favorites.count()
+        return obj.favoriterelation.count()
 
     favorites_count.short_description = 'В избранном'
 
