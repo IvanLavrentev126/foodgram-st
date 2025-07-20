@@ -62,3 +62,5 @@ docker-compose exec backend python manage.py createsuperuser
 ```bash
 docker-compose exec backend python manage.py load_data
 ```
+
+#### Пример .env файла находится в backend/.env.example
