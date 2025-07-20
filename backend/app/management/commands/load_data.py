@@ -1,3 +1,7 @@
+import json
+import os
+from pathlib import Path
+
 from django.core.management.base import BaseCommand
 from django.contrib.auth import get_user_model
 from app.models import Recipe, Ingredient, RecipeIngredient
@@ -25,38 +29,20 @@ class Command(BaseCommand):
                 username=data_generator.unique.user_name(),
                 first_name=data_generator.first_name(),
                 last_name=data_generator.last_name(),
-                password="sample123",
+                password=data_generator.password(),
             )
             user_list.append(new_user)
             self.stdout.write(f"Added user: {new_user.email}")
-
-        components = [
-            ("Пшеничная мука", "граммы"),
-            ("Кристаллический сахар", "граммы"),
-            ("Поваренная соль", "чайные ложки"),
-            ("Чёрный перец", "чайные ложки"),
-            ("Куриные яйца", "штуки"),
-            ("Цельное молоко", "миллилитры"),
-            ("Подсолнечное масло", "столовые ложки"),
-            ("Репчатый лук", "штуки"),
-            ("Чеснок свежий", "зубчики"),
-            ("Томаты красные", "штуки"),
-            ("Говяжий фарш", "граммы"),
-            ("Сливочное масло", "граммы"),
-            ("Петрушка свежая", "граммы"),
-            ("Лимонный сок", "миллилитры"),
-            ("Оливковое масло", "миллилитры"),
-            ("Морковь", "штуки"),
-            ("Картофель", "штуки"),
-            ("Сметана", "граммы"),
-            ("Уксус столовый", "миллилитры"),
-            ("Рис белый", "граммы")
-        ]
+        json_path = Path(__file__).parent.parent / 'fixtures' / 'ingredients.json'
+        with open(json_path) as file:
+            components = json.load(file)
 
         self.stdout.write("Preparing ingredients...")
-        for item, measure in components:
+        for item in components:
+            name = item['name']
+            measurement_unit = item['measurement_unit']
             obj, is_new = Ingredient.objects.get_or_create(
-                name=item, defaults={"measurement_unit": measure}
+                name=name, defaults={"measurement_unit": measurement_unit}
             )
             if is_new:
                 self.stdout.write(f"Added ingredient: {obj}")
