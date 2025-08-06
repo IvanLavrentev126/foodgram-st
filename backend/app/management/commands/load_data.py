@@ -1,5 +1,4 @@
 import json
-import os
 from pathlib import Path
 
 from django.core.management.base import BaseCommand
@@ -86,3 +85,4 @@ class Command(BaseCommand):
                 self.stdout.write(f"Added dish: {new_recipe.name} by {account.email}")
 
         self.stdout.write(self.style.SUCCESS("Test data generation complete"))
+
