@@ -89,19 +89,6 @@ class IngredientRecipeSerializer(serializers.ModelSerializer):
         fields = ('id', 'name', 'measurement_unit', 'amount')
 
 
-class UserSerializer(serializers.ModelSerializer):
-    is_subscribed = serializers.SerializerMethodField(read_only=True)
-
-    class Meta:
-        model = User
-        fields = ('id', 'email', 'username', 'first_name', 'last_name', 'is_subscribed', 'avatar')
-
-    def get_is_subscribed(self, obj):
-        if self.context['request'].user.is_authenticated:
-            return Subscription.objects.filter(sender=self.context['request'].user, to=obj).exists()
-        return False
-
-
 class RecipeListSerializer(serializers.ModelSerializer):
     author = UserSerializer(read_only=True)
     ingredients = IngredientRecipeSerializer(
@@ -288,3 +275,4 @@ class SubscribedSerializer(serializers.ModelSerializer):
             recipes = recipes[:int(recipes_limit)]
         serializer = RecipeShortSerializer(recipes, many=True, read_only=True, context=self.context)
         return serializer.data
+
