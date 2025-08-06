@@ -102,7 +102,7 @@ class MainUserViewSet(UserViewSet):
 
             if deleted_count == 0:
                 return Response(
-                    {'detail': 'Подписка не найдена.'},
+                    {'detail': 'Подписка не была найдена.'},
                     status=status.HTTP_400_BAD_REQUEST
                 )
 
@@ -163,15 +163,13 @@ class RecipeViewSet(viewsets.ModelViewSet):
     def get_serializer_class(self):
         if self.action.lower() in ['list', 'retrieve']:
             return RecipeListSerializer
-        else:
-            return RecipeCreateUpdateSerializer
+        return RecipeCreateUpdateSerializer
 
     def get_queryset(self):
         queryset = Recipe.objects.all().select_related('author').prefetch_related('ingredients')
         if self.action.lower() in ['list', 'retrieve']:
             return self._list_retrieve_queryset_builder(queryset)
-        else:
-            return queryset
+        return queryset
 
     def _list_retrieve_queryset_builder(self, queryset):
         user = self.request.user
@@ -201,15 +199,22 @@ class RecipeViewSet(viewsets.ModelViewSet):
 
         if request.method == 'POST':
             recipe = get_object_or_404(Recipe, pk=pk)
-            favorite_serializer = FavoriteRelationSerializer(data={'user': request.user.pk, 'recipe': recipe.pk})
+            favorite_serializer = FavoriteRelationSerializer(
+                data={
+                    'user': request.user.pk,
+                    'recipe': recipe.pk
+                }
+            )
             favorite_serializer.is_valid(raise_exception=True)
             favorite_serializer.save()
             serializer = RecipeShortSerializer(recipe, context={'request': request})
             return Response(serializer.data, status=status.HTTP_201_CREATED)
 
         if request.method == 'DELETE':
-            deleted_count, _ = FavoriteRelation.objects.filter(user=request.user,
-                                                               recipe_id=pk).delete()
+            deleted_count, _ = FavoriteRelation.objects.filter(
+                user=request.user,
+                recipe_id=pk
+            ).delete()
             if deleted_count == 0:
                 return Response(
                     {'detail': 'Рецепт не найден.'},
@@ -221,10 +226,18 @@ class RecipeViewSet(viewsets.ModelViewSet):
     def shopping_cart(self, request, pk=None):
         if request.method == 'POST':
             recipe = get_object_or_404(Recipe, pk=pk)
-            shopping_cart_serializer = ShoppingCartSerializer(data={'user': request.user.pk, 'recipe': recipe.pk})
+            shopping_cart_serializer = ShoppingCartSerializer(
+                data={
+                    'user': request.user.pk,
+                    'recipe': recipe.pk
+                }
+            )
             shopping_cart_serializer.is_valid(raise_exception=True)
             shopping_cart_serializer.save()
-            serializer = RecipeShortSerializer(recipe, context={'request': request})
+            serializer = RecipeShortSerializer(
+                recipe,
+                context={'request': request}
+            )
             return Response(serializer.data, status=status.HTTP_201_CREATED)
 
         if request.method == 'DELETE':

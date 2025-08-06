@@ -5,6 +5,7 @@ from app.models import (
     RecipeIngredient,
     ShoppingCartRelation,
 )
+
 from django.contrib import admin
 from django.contrib.auth import get_user_model
 from django.contrib.auth.admin import UserAdmin
@@ -31,8 +32,6 @@ class IngredientAdmin(admin.ModelAdmin):
 
 class RecipeIngredientInline(admin.TabularInline):
     model = RecipeIngredient
-    extra = 1
-    min_num = 1
 
 
 @admin.register(Recipe)

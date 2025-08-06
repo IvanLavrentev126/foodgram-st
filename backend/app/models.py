@@ -1,7 +1,7 @@
 import random
 import string
 
-from constants import MAX_TIME, MIN_TIME, MIN_AMOUNT, MAX_AMOUNT
+from constants import MIN_COOKING_TIME, MAX_COOKING_TIME, MIN_INGREDIENTS_AMOUNT, MAX_INGREDIENTS_AMOUNT
 from django.contrib.auth.models import AbstractUser
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
@@ -79,10 +79,10 @@ class Recipe(models.Model):
         'Время приготовления (мин)',
         validators=[
             MinValueValidator(
-                MIN_TIME
+                MIN_COOKING_TIME
             ),
             MaxValueValidator(
-                MAX_TIME
+                MAX_COOKING_TIME
             )
         ]
     )
@@ -126,10 +126,10 @@ class RecipeIngredient(models.Model):
         'Количество',
         validators=[
             MinValueValidator(
-                MIN_AMOUNT
+                MIN_INGREDIENTS_AMOUNT
             ),
             MaxValueValidator(
-                MAX_AMOUNT
+                MAX_INGREDIENTS_AMOUNT
             )
         ]
     )

@@ -65,7 +65,7 @@ class AvatarSerializer(serializers.ModelSerializer):
                 file_name = f"{uuid.uuid4()}.{extension}"
                 file_content = ContentFile(base64.b64decode(avatar_data))
                 instance.avatar.save(file_name, file_content)
-            except Exception as e:
+            except Exception:
                 raise ValidationError("Invalid avatar data format")
         else:
             instance.avatar = avatar
@@ -115,8 +115,10 @@ class RecipeListSerializer(serializers.ModelSerializer):
     class Meta:
         model = Recipe
         fields = (
-            'id', 'author', 'ingredients', 'is_favorited', 'is_in_shopping_cart', 'name', 'image', 'text',
-            'cooking_time')
+            'id', 'author', 'ingredients',
+            'is_favorited', 'is_in_shopping_cart', 'name',
+            'image', 'text', 'cooking_time'
+        )
 
 
 class RecipeIngredientWriteSerializer(serializers.Serializer):
@@ -130,7 +132,7 @@ class BaseImageSerializerField(serializers.Field):
             format_, imgstr = data.split(';base64,')
             ext = format_.split('/')[-1]
             return ContentFile(base64.b64decode(imgstr), name=f'{uuid.uuid4()}.{ext}')
-        except:
+        except Exception:
             raise serializers.ValidationError()
 
 
@@ -150,7 +152,9 @@ class RecipeCreateUpdateSerializer(serializers.ModelSerializer):
         recipe = Recipe.objects.create(
             author=self.context['request'].user,
             image=image,
-            **validated_data
+            name=validated_data['name'],
+            text=validated_data['text'],
+            cooking_time=validated_data['cooking_time'],
         )
         self._add_ingredients(recipe, ingredients)
         return recipe
@@ -167,15 +171,15 @@ class RecipeCreateUpdateSerializer(serializers.ModelSerializer):
         user = self.context['request'].user
         instance.is_favorited = user.favoriterelation.filter(recipe=instance).exists()
         instance.is_in_shopping_cart = user.shoppingcartrelation.filter(recipe=instance).exists()
-        return RecipeListSerializer(instance,
-                                    context={'request': self.context['request']}).data
+        return RecipeListSerializer(
+            instance,
+            context={'request': self.context['request']}
+        ).data
 
     def validate_ingredients(self, value):
-        if not value:
-            raise serializers.ValidationError
+        if not value or len(value) < 1:
+            raise serializers.ValidationError('Ингредиенты не могут быть пустыми')
         ingredients_list = []
-        if len(value) < 1:
-            raise serializers.ValidationError
         for ingredient in value:
             if not ingredient.get('id') or (ingredient['id'] in ingredients_list) or ingredient.get('amount', 0) < 1:
                 raise serializers.ValidationError
