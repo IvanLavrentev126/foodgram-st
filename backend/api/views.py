@@ -15,9 +15,9 @@ from api.serializers import (
     SubscriptionSerializer,
     UserSerializer,
 )
-from app.models import FavoriteRelation, Ingredient, Recipe, Subscription
+from app.models import Ingredient, Recipe, Subscription
 from django.contrib.auth import get_user_model
-from django.db.models import BooleanField, Count, Exists, OuterRef, Sum, Value
+from django.db.models import BooleanField, Count, Exists, F, OuterRef, Sum, Value
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse
 from django_filters.rest_framework import DjangoFilterBackend
@@ -194,82 +194,74 @@ class RecipeViewSet(viewsets.ModelViewSet):
         inst = get_object_or_404(Recipe, pk=pk)
         return Response({'short-link': reverse('short-link', kwargs={'pk': inst.short_link})})
 
-    @action(detail=True, methods=['post', 'delete'], url_path='favorite')
-    def favorite(self, request, pk=None):
-
+    def _handle_relation_action(self, request, pk, serializer_class, user_related_qs):
         if request.method == 'POST':
             recipe = get_object_or_404(Recipe, pk=pk)
-            favorite_serializer = FavoriteRelationSerializer(
+            relation_serializer = serializer_class(
                 data={
                     'user': request.user.pk,
                     'recipe': recipe.pk
                 }
             )
-            favorite_serializer.is_valid(raise_exception=True)
-            favorite_serializer.save()
+            relation_serializer.is_valid(raise_exception=True)
+            relation_serializer.save()
             serializer = RecipeShortSerializer(recipe, context={'request': request})
             return Response(serializer.data, status=status.HTTP_201_CREATED)
 
         if request.method == 'DELETE':
-            deleted_count, _ = FavoriteRelation.objects.filter(
-                user=request.user,
-                recipe_id=pk
-            ).delete()
+            deleted_count, _ = user_related_qs.filter(recipe_id=pk).delete()
             if deleted_count == 0:
                 return Response(
                     {'detail': 'Рецепт не найден.'},
                     status=status.HTTP_404_NOT_FOUND
                 )
             return Response(status=status.HTTP_204_NO_CONTENT)
+
+    @action(detail=True, methods=['post', 'delete'], url_path='favorite')
+    def favorite(self, request, pk=None):
+        return self._handle_relation_action(
+            request,
+            pk,
+            serializer_class=FavoriteRelationSerializer,
+            user_related_qs=request.user.favoriterelation
+        )
 
     @action(detail=True, methods=['post', 'delete'], url_path='shopping_cart')
     def shopping_cart(self, request, pk=None):
-        if request.method == 'POST':
-            recipe = get_object_or_404(Recipe, pk=pk)
-            shopping_cart_serializer = ShoppingCartSerializer(
-                data={
-                    'user': request.user.pk,
-                    'recipe': recipe.pk
-                }
-            )
-            shopping_cart_serializer.is_valid(raise_exception=True)
-            shopping_cart_serializer.save()
-            serializer = RecipeShortSerializer(
-                recipe,
-                context={'request': request}
-            )
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-
-        if request.method == 'DELETE':
-            deleted_count, _ = request.user.shoppingcartrelation.filter(recipe_id=pk).delete()
-            if deleted_count == 0:
-                return Response(
-                    {'detail': 'Рецепт не найден.'},
-                    status=status.HTTP_404_NOT_FOUND
-                )
-            return Response(status=status.HTTP_204_NO_CONTENT)
+        return self._handle_relation_action(
+            request,
+            pk,
+            serializer_class=ShoppingCartSerializer,
+            user_related_qs=request.user.shoppingcartrelation
+        )
 
     @action(detail=False, methods=['get'], url_path='download_shopping_cart')
     def download_shopping_cart(self, request):
-        ingredients = request.user.shoppingcartrelation.all().values(
-            'recipe__recipe_ingredients__ingredient__name',
-            'recipe__recipe_ingredients__ingredient__measurement_unit'
-        ).annotate(
-            total_amount=Sum('recipe__recipe_ingredients__amount')
-        ).order_by('recipe__recipe_ingredients__ingredient__name')
+        ingredients = (
+            request.user.shoppingcartrelation.select_related(
+                'recipe', 'recipe__recipe_ingredients__ingredient'
+            )
+            .values(
+                name=F('recipe__recipe_ingredients__ingredient__name'),
+                unit=F('recipe__recipe_ingredients__ingredient__measurement_unit'),
+            )
+            .annotate(total_amount=Sum('recipe__recipe_ingredients__amount'))
+            .order_by('name')
+        )
 
-        text_content = "Список покупок:\n\n"
+        text_content = "Покупки-покупки-покупочки мои:\n\n"
         for item in ingredients:
-            name = item['recipe__recipe_ingredients__ingredient__name']
-            unit = item['recipe__recipe_ingredients__ingredient__measurement_unit']
-            amount = item['total_amount']
-            text_content += f"{name} - {amount} {unit}\n"
+            text_content += f"{item['name']} - {item['total_amount']} {item['unit']}\n"
 
         return self._create_shopping_list_response(text_content)
 
     @staticmethod
     def _create_shopping_list_response(content):
-        response = Response(content, content_type='text/plain', status=status.HTTP_200_OK)
+        response = Response(
+            content,
+            content_type='text/plain',
+            status=status.HTTP_200_OK
+        )
         response['Content-Disposition'] = 'attachment; filename="shopping_list.txt"'
         return response
 

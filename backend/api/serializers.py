@@ -10,6 +10,7 @@ from app.models import (
     ShoppingCartRelation,
     Subscription,
 )
+from constants import subscribed_user_recipe_limit
 from django.contrib.auth import get_user_model
 from django.core.files.base import ContentFile
 from django.db import transaction
@@ -39,9 +40,8 @@ class UserSerializer(serializers.ModelSerializer):
         fields = ('id', 'email', 'username', 'first_name', 'last_name', 'avatar', 'is_subscribed')
 
     def get_is_subscribed(self, obj):
-        if self.context['request'].user.is_authenticated:
-            return Subscription.objects.filter(sender=self.context['request'].user, to=obj).exists()
-        return False
+        user = self.context['request'].user
+        return user.is_authenticated and user.sender.filter(to=obj).exists()
 
 
 class AvatarSerializer(serializers.ModelSerializer):
@@ -166,11 +166,16 @@ class RecipeCreateUpdateSerializer(serializers.ModelSerializer):
     def validate_ingredients(self, value):
         if not value or len(value) < 1:
             raise serializers.ValidationError('Ингредиенты не могут быть пустыми')
-        ingredients_list = []
+
+        ingredients_list = set()
         for ingredient in value:
-            if not ingredient.get('id') or (ingredient['id'] in ingredients_list) or ingredient.get('amount', 0) < 1:
-                raise serializers.ValidationError
-            ingredients_list.append(ingredient['id'])
+            if not ingredient.get('id'):
+                raise serializers.ValidationError('ID ингредиента обязателен')
+            if ingredient['id'] in ingredients_list:
+                raise serializers.ValidationError('Ингредиенты не должны повторяться')
+            if ingredient.get('amount', 0) < 1:
+                raise serializers.ValidationError('Количество ингредиента должно быть больше 0')
+            ingredients_list.add(ingredient['id'])
         return value
 
     def _add_ingredients(self, recipe, ingredients):
@@ -263,16 +268,13 @@ class SubscribedSerializer(serializers.ModelSerializer):
         )
 
     def get_is_subscribed(self, obj):
-        if self.context['request'].user.is_authenticated:
-            return Subscription.objects.filter(sender=self.context['request'].user, to=obj).exists()
-        return False
+        user = self.context['request'].user
+        return user.is_authenticated and user.sender.filter(to=obj).exists()
 
     def get_recipes(self, obj):
-        recipes = obj.recipes.all()
-        recipes_limit = self.context.get('request').query_params.get('recipes_limit') if self.context.get(
-            'request') else None
-        if recipes_limit and recipes_limit.isdigit():
-            recipes = recipes[:int(recipes_limit)]
-        serializer = RecipeShortSerializer(recipes, many=True, read_only=True, context=self.context)
-        return serializer.data
-
+        try:
+            limit = int(self.context['request'].query_params.get('recipes_limit', subscribed_user_recipe_limit))
+        except ValueError:
+            limit = subscribed_user_recipe_limit
+        recipes = obj.recipes.all()[:limit]
+        return RecipeShortSerializer(recipes, many=True, context=self.context).data

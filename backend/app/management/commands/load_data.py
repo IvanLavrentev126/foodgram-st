@@ -1,13 +1,13 @@
 import json
+import random
+from io import BytesIO
 from pathlib import Path
 
-from django.core.management.base import BaseCommand
+from app.models import Ingredient, Recipe, RecipeIngredient
 from django.contrib.auth import get_user_model
-from app.models import Recipe, Ingredient, RecipeIngredient
-from faker import Faker
-import random
 from django.core.files import File
-from io import BytesIO
+from django.core.management.base import BaseCommand
+from faker import Faker
 from PIL import Image
 
 CustomUser = get_user_model()
@@ -85,4 +85,3 @@ class Command(BaseCommand):
                 self.stdout.write(f"Added dish: {new_recipe.name} by {account.email}")
 
         self.stdout.write(self.style.SUCCESS("Test data generation complete"))
-

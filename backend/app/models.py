@@ -1,7 +1,12 @@
 import random
 import string
 
-from constants import MIN_COOKING_TIME, MAX_COOKING_TIME, MIN_INGREDIENTS_AMOUNT, MAX_INGREDIENTS_AMOUNT
+from constants import (
+    MAX_COOKING_TIME,
+    MAX_INGREDIENTS_AMOUNT,
+    MIN_COOKING_TIME,
+    MIN_INGREDIENTS_AMOUNT,
+)
 from django.contrib.auth.models import AbstractUser
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
