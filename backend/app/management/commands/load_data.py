@@ -3,24 +3,25 @@ import random
 from io import BytesIO
 from pathlib import Path
 
-from app.models import Ingredient, Recipe, RecipeIngredient
 from django.contrib.auth import get_user_model
 from django.core.files import File
 from django.core.management.base import BaseCommand
 from faker import Faker
 from PIL import Image
 
+from app.models import Ingredient, Recipe, RecipeIngredient
+
 CustomUser = get_user_model()
 data_generator = Faker()
 
 
 class Command(BaseCommand):
-    help_text = "Generates sample data: users and their recipes"
+    help_text = 'Generates sample data: users and their recipes'
     user_count = 5
     dish_count = 10
 
     def handle(self, *args, **kwargs):
-        self.stdout.write(f"Generating {self.user_count} sample users...")
+        self.stdout.write(f'Generating {self.user_count} sample users...')
         user_list = []
         for i in range(self.user_count):
             new_user = CustomUser.objects.create(
@@ -31,28 +32,28 @@ class Command(BaseCommand):
                 password=data_generator.password(),
             )
             user_list.append(new_user)
-            self.stdout.write(f"Added user: {new_user.email}")
+            self.stdout.write(f'Added user: {new_user.email}')
         json_path = Path(__file__).parent.parent / 'fixtures' / 'ingredients.json'
-        with open(json_path) as file:
+        with open(json_path, encoding='utf-8') as file:
             components = json.load(file)
 
-        self.stdout.write("Preparing ingredients...")
+        self.stdout.write('Preparing ingredients...')
         for item in components:
             name = item['name']
             measurement_unit = item['measurement_unit']
             obj, is_new = Ingredient.objects.get_or_create(
-                name=name, defaults={"measurement_unit": measurement_unit}
+                name=name, defaults={'measurement_unit': measurement_unit}
             )
             if is_new:
-                self.stdout.write(f"Added ingredient: {obj}")
+                self.stdout.write(f'Added ingredient: {obj}')
 
         available_ingredients = list(Ingredient.objects.all())
 
-        self.stdout.write(f"Creating {self.dish_count} dishes per user...")
+        self.stdout.write(f'Creating {self.dish_count} dishes per user...')
         for account in user_list:
             for j in range(self.dish_count):
                 img = Image.new(
-                    "RGB",
+                    'RGB',
                     (120, 120),
                     color=(
                         random.randrange(0, 256),
@@ -61,14 +62,14 @@ class Command(BaseCommand):
                     ),
                 )
                 img_buffer = BytesIO()
-                img.save(img_buffer, format="JPEG")
-                img_file = File(img_buffer, name=f"dish_{data_generator.unique.word()}.jpg")
+                img.save(img_buffer, format='JPEG')
+                img_file = File(img_buffer, name=f'dish_{data_generator.unique.word()}.jpg')
 
                 new_recipe = Recipe.objects.create(
                     author=account,
                     name=data_generator.sentence(nb_words=4),
                     image=img_file,
-                    text="\n".join(data_generator.texts(nb_texts=3)),
+                    text='\n'.join(data_generator.texts(nb_texts=3)),
                     cooking_time=random.randrange(5, 125),
                 )
 
@@ -82,6 +83,6 @@ class Command(BaseCommand):
                         amount=random.randrange(50, 1000),
                     )
 
-                self.stdout.write(f"Added dish: {new_recipe.name} by {account.email}")
+                self.stdout.write(f'Added dish: {new_recipe.name} by {account.email}')
 
-        self.stdout.write(self.style.SUCCESS("Test data generation complete"))
+        self.stdout.write(self.style.SUCCESS('Test data generation complete'))

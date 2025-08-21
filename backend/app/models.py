@@ -1,15 +1,16 @@
 import random
 import string
 
+from django.contrib.auth.models import AbstractUser
+from django.core.validators import MaxValueValidator, MinValueValidator
+from django.db import models
+
 from constants import (
     MAX_COOKING_TIME,
     MAX_INGREDIENTS_AMOUNT,
     MIN_COOKING_TIME,
     MIN_INGREDIENTS_AMOUNT,
 )
-from django.contrib.auth.models import AbstractUser
-from django.core.validators import MaxValueValidator, MinValueValidator
-from django.db import models
 
 
 def create_random_string(length=8):
@@ -181,24 +182,12 @@ class BaseUserRecipeRelation(models.Model):
 
 
 class FavoriteRelation(BaseUserRecipeRelation):
-    class Meta(BaseUserRecipeRelation.Meta):
-        constraints = [
-            models.UniqueConstraint(
-                fields=['user', 'recipe'],
-                name='unique_favorite'
-            )
-        ]
+    class Meta:
         verbose_name = 'Избранное'
         verbose_name_plural = 'Избранные'
 
 
 class ShoppingCartRelation(BaseUserRecipeRelation):
-    class Meta(BaseUserRecipeRelation.Meta):
-        constraints = [
-            models.UniqueConstraint(
-                fields=['user', 'recipe'],
-                name='unique_shopping_cart'
-            )
-        ]
+    class Meta:
         verbose_name = 'Корзина покупок'
         verbose_name_plural = 'Корзины покупок'

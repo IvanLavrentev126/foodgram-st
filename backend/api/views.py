@@ -1,5 +1,17 @@
 import logging
 
+from django.contrib.auth import get_user_model
+from django.db.models import BooleanField, Count, Exists, F, OuterRef, Sum, Value
+from django.shortcuts import get_object_or_404, redirect
+from django.urls import reverse
+from django_filters.rest_framework import DjangoFilterBackend
+from djoser.views import UserViewSet
+from rest_framework import status, viewsets
+from rest_framework.decorators import action
+from rest_framework.pagination import LimitOffsetPagination
+from rest_framework.permissions import IsAuthenticated, IsAuthenticatedOrReadOnly
+from rest_framework.response import Response
+
 from api.filters import IngredientFilter, RecipeFilter
 from api.pagination import RecipePagination
 from api.permissions import IsRecipeOwner
@@ -16,17 +28,6 @@ from api.serializers import (
     UserSerializer,
 )
 from app.models import Ingredient, Recipe, Subscription
-from django.contrib.auth import get_user_model
-from django.db.models import BooleanField, Count, Exists, F, OuterRef, Sum, Value
-from django.shortcuts import get_object_or_404, redirect
-from django.urls import reverse
-from django_filters.rest_framework import DjangoFilterBackend
-from djoser.views import UserViewSet
-from rest_framework import status, viewsets
-from rest_framework.decorators import action
-from rest_framework.pagination import LimitOffsetPagination
-from rest_framework.permissions import IsAuthenticated, IsAuthenticatedOrReadOnly
-from rest_framework.response import Response
 
 User = get_user_model()
 
@@ -191,8 +192,8 @@ class RecipeViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['get'], url_path='get-link')
     def get_link(self, request, pk=None):
-        inst = get_object_or_404(Recipe, pk=pk)
-        return Response({'short-link': reverse('short-link', kwargs={'pk': inst.short_link})})
+        recipe = get_object_or_404(Recipe, pk=pk)
+        return Response({'short-link': reverse('short-link', kwargs={'pk': recipe.short_link})})
 
     def _handle_relation_action(self, request, pk, serializer_class, user_related_qs):
         if request.method == 'POST':
@@ -237,8 +238,19 @@ class RecipeViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['get'], url_path='download_shopping_cart')
     def download_shopping_cart(self, request):
+        shopping_list_text = self.generate_shopping_list(request.user.shoppingcartrelation)
+
+        response = Response(
+            shopping_list_text,
+            content_type='text/plain',
+            status=status.HTTP_200_OK
+        )
+        response['Content-Disposition'] = 'attachment; filename="shopping_list.txt"'
+        return response
+
+    def generate_shopping_list(self, shopping_cart):
         ingredients = (
-            request.user.shoppingcartrelation.select_related(
+            shopping_cart.select_related(
                 'recipe', 'recipe__recipe_ingredients__ingredient'
             )
             .values(
@@ -249,21 +261,11 @@ class RecipeViewSet(viewsets.ModelViewSet):
             .order_by('name')
         )
 
-        text_content = "Покупки-покупки-покупочки мои:\n\n"
+        text_content = 'Покупки-покупки-покупочки мои:\n\n'
         for item in ingredients:
             text_content += f"{item['name']} - {item['total_amount']} {item['unit']}\n"
 
-        return self._create_shopping_list_response(text_content)
-
-    @staticmethod
-    def _create_shopping_list_response(content):
-        response = Response(
-            content,
-            content_type='text/plain',
-            status=status.HTTP_200_OK
-        )
-        response['Content-Disposition'] = 'attachment; filename="shopping_list.txt"'
-        return response
+        return text_content
 
 
 def view_short_link(request, pk):

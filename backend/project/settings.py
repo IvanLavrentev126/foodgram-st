@@ -3,11 +3,7 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-# Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
-
-# Quick-start development settings - unsuitable for production
-# See https://docs.djangoproject.com/en/4.0/howto/deployment/checklist/
 
 load_dotenv('.env.example')
 
@@ -18,21 +14,16 @@ DEBUG = os.getenv('DEBUG') == 'true'
 ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', '').split(',')
 
 INSTALLED_APPS = [
-    # Django core apps
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-
-    # Third-party apps
     'rest_framework',
     'rest_framework.authtoken',
     'djoser',
     'django_filters',
-
-    # Local apps
     'app',
 ]
 
@@ -79,10 +70,6 @@ DJOSER = {
 
 WSGI_APPLICATION = 'project.wsgi.application'
 
-# Database
-# https://docs.djangoproject.com/en/4.0/ref/settings/#databases
-
-
 if os.getenv('USE_POSTGRES', '').lower() == 'true':
     DATABASES = {
         'default': {
@@ -101,8 +88,6 @@ else:
             'NAME': BASE_DIR / 'db.sqlite3',
         }
     }
-# Password validation
-# https://docs.djangoproject.com/en/4.0/ref/settings/#auth-password-validators
 
 AUTH_PASSWORD_VALIDATORS = [
     {
@@ -145,4 +130,4 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-AUTH_USER_MODEL = "app.User"
+AUTH_USER_MODEL = 'app.User'

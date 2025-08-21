@@ -2,6 +2,14 @@ import base64
 import logging
 import uuid
 
+from django.contrib.auth import get_user_model
+from django.core.files.base import ContentFile
+from django.db import transaction
+from djoser.serializers import UserCreateSerializer
+from rest_framework import serializers
+from rest_framework.exceptions import ValidationError
+from rest_framework.validators import UniqueValidator
+
 from app.models import (
     FavoriteRelation,
     Ingredient,
@@ -11,13 +19,6 @@ from app.models import (
     Subscription,
 )
 from constants import subscribed_user_recipe_limit
-from django.contrib.auth import get_user_model
-from django.core.files.base import ContentFile
-from django.db import transaction
-from djoser.serializers import UserCreateSerializer
-from rest_framework import serializers
-from rest_framework.exceptions import ValidationError
-from rest_framework.validators import UniqueValidator
 
 User = get_user_model()
 
@@ -53,7 +54,7 @@ class AvatarSerializer(serializers.ModelSerializer):
 
     def validate(self, data):
         if not data.get('avatar'):
-            raise serializers.ValidationError("No avatar data provided")
+            raise serializers.ValidationError('No avatar data provided')
         return data
 
     def update(self, instance, validated_data):
@@ -61,12 +62,12 @@ class AvatarSerializer(serializers.ModelSerializer):
         if ';base64,' in avatar:
             try:
                 extension, avatar_data = avatar.split(';base64,')
-                extension = extension.split("/")[-1]
-                file_name = f"{uuid.uuid4()}.{extension}"
+                extension = extension.split('/')[-1]
+                file_name = f'{uuid.uuid4()}.{extension}'
                 file_content = ContentFile(base64.b64decode(avatar_data))
                 instance.avatar.save(file_name, file_content)
             except Exception:
-                raise ValidationError("Invalid avatar data format")
+                raise ValidationError('Invalid avatar data format')
         else:
             instance.avatar = avatar
             instance.save()
@@ -134,16 +135,16 @@ class RecipeCreateUpdateSerializer(serializers.ModelSerializer):
     @transaction.atomic
     def create(self, validated_data):
         ingredients = validated_data.pop('ingredients')
-        image = validated_data.pop('image')
+        image = validated_data.pop('image', None)
 
-        recipe = Recipe.objects.create(
-            author=self.context['request'].user,
-            image=image,
-            name=validated_data['name'],
-            text=validated_data['text'],
-            cooking_time=validated_data['cooking_time'],
-        )
+        recipe = super().create({
+            **validated_data,
+            'author': self.context['request'].user,
+            'image': image
+        })
+
         self._add_ingredients(recipe, ingredients)
+
         return recipe
 
     @transaction.atomic
@@ -225,15 +226,15 @@ class SubscriptionSerializer(serializers.ModelSerializer):
         to = data.get('to')
 
         if sender == to:
-            raise ValidationError("Нельзя подписаться на самого себя")
+            raise ValidationError('Нельзя подписаться на самого себя')
 
         if request and request.method == 'POST':
             if Subscription.objects.filter(sender=sender, to=to).exists():
-                raise ValidationError("Вы уже подписаны на этого пользователя")
+                raise ValidationError('Вы уже подписаны на этого пользователя')
 
         if request and request.method == 'DELETE':
             if not Subscription.objects.filter(sender=sender, to=to).exists():
-                raise ValidationError("Вы не подписаны на этого пользователя")
+                raise ValidationError('Вы не подписаны на этого пользователя')
 
         return data
 
@@ -272,9 +273,10 @@ class SubscribedSerializer(serializers.ModelSerializer):
         return user.is_authenticated and user.sender.filter(to=obj).exists()
 
     def get_recipes(self, obj):
-        try:
-            limit = int(self.context['request'].query_params.get('recipes_limit', subscribed_user_recipe_limit))
-        except ValueError:
-            limit = subscribed_user_recipe_limit
+        limit = self.context['request'].query_params.get('recipes_limit', subscribed_user_recipe_limit)
+        if isinstance(limit, str):
+            if not limit.isdigit():
+                limit = subscribed_user_recipe_limit
+            limit = int(limit)
         recipes = obj.recipes.all()[:limit]
         return RecipeShortSerializer(recipes, many=True, context=self.context).data
