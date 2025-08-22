@@ -1,7 +1,9 @@
+import io
 import logging
 
 from django.contrib.auth import get_user_model
 from django.db.models import BooleanField, Count, Exists, F, OuterRef, Sum, Value
+from django.http import FileResponse
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse
 from django_filters.rest_framework import DjangoFilterBackend
@@ -236,23 +238,24 @@ class RecipeViewSet(viewsets.ModelViewSet):
             user_related_qs=request.user.shoppingcartrelation
         )
 
+    @staticmethod
+    def generate_shopping_list(ingredients) -> io.BytesIO:
+        """
+        Формирует список покупок и возвращает файловый буфер.
+        """
+        buffer = io.BytesIO()
+        buffer.write("Покупки-покупки-покупочки мои:\n\n".encode("utf-8"))
+        for item in ingredients:
+            line = f"{item['name']} - {item['total_amount']} {item['unit']}\n"
+            buffer.write(line.encode("utf-8"))
+        buffer.seek(0)
+        return buffer
+
     @action(detail=False, methods=['get'], url_path='download_shopping_cart')
     def download_shopping_cart(self, request):
-        shopping_list_text = self.generate_shopping_list(request.user.shoppingcartrelation)
-
-        response = Response(
-            shopping_list_text,
-            content_type='text/plain',
-            status=status.HTTP_200_OK
-        )
-        response['Content-Disposition'] = 'attachment; filename="shopping_list.txt"'
-        return response
-
-    def generate_shopping_list(self, shopping_cart):
         ingredients = (
-            shopping_cart.select_related(
-                'recipe', 'recipe__recipe_ingredients__ingredient'
-            )
+            request.user.shoppingcartrelation
+            .select_related('recipe', 'recipe__recipe_ingredients__ingredient')
             .values(
                 name=F('recipe__recipe_ingredients__ingredient__name'),
                 unit=F('recipe__recipe_ingredients__ingredient__measurement_unit'),
@@ -261,11 +264,15 @@ class RecipeViewSet(viewsets.ModelViewSet):
             .order_by('name')
         )
 
-        text_content = 'Покупки-покупки-покупочки мои:\n\n'
-        for item in ingredients:
-            text_content += f"{item['name']} - {item['total_amount']} {item['unit']}\n"
+        buffer = self.generate_shopping_list(ingredients)
 
-        return text_content
+        return FileResponse(
+            buffer,
+            as_attachment=True,
+            filename="shopping_list.txt",
+            content_type="text/plain",
+            status=status.HTTP_200_OK
+        )
 
 
 def view_short_link(request, pk):
