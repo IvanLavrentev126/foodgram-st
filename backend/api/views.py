@@ -167,7 +167,7 @@ class RecipeViewSet(viewsets.ModelViewSet):
         return RecipeCreateUpdateSerializer
 
     def get_queryset(self):
-        queryset = Recipe.objects.all().select_related('author').prefetch_related('ingredients')
+        queryset = Recipe.objects.select_related('author').prefetch_related('ingredients')
         if self.action.lower() in ['list', 'retrieve']:
             return self._list_retrieve_queryset_builder(queryset)
         return queryset

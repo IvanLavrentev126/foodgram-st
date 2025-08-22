@@ -76,12 +76,16 @@ class Command(BaseCommand):
                 selected_components = random.sample(
                     available_ingredients, random.randrange(3, 6)
                 )
-                for component in selected_components:
-                    RecipeIngredient.objects.create(
+                ingredients = [
+                    RecipeIngredient(
                         recipe=new_recipe,
                         ingredient=component,
                         amount=random.randrange(50, 1000),
                     )
+                    for component in selected_components
+                ]
+
+                RecipeIngredient.objects.bulk_create(ingredients)
 
                 self.stdout.write(f'Added dish: {new_recipe.name} by {account.email}')
 

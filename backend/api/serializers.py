@@ -1,15 +1,13 @@
-import base64
 import logging
-import uuid
 
 from django.contrib.auth import get_user_model
-from django.core.files.base import ContentFile
 from django.db import transaction
 from djoser.serializers import UserCreateSerializer
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
 from rest_framework.validators import UniqueValidator
 
+from api.utils import base64_to_content_file
 from app.models import (
     FavoriteRelation,
     Ingredient,
@@ -59,18 +57,14 @@ class AvatarSerializer(serializers.ModelSerializer):
 
     def update(self, instance, validated_data):
         avatar = validated_data.get('avatar')
+
         if ';base64,' in avatar:
-            try:
-                extension, avatar_data = avatar.split(';base64,')
-                extension = extension.split('/')[-1]
-                file_name = f'{uuid.uuid4()}.{extension}'
-                file_content = ContentFile(base64.b64decode(avatar_data))
-                instance.avatar.save(file_name, file_content)
-            except Exception:
-                raise ValidationError('Invalid avatar data format')
+            file_content = base64_to_content_file(avatar)
+            instance.avatar.save(file_content.name, file_content)
         else:
             instance.avatar = avatar
             instance.save()
+
         return instance
 
 
@@ -116,12 +110,7 @@ class RecipeIngredientWriteSerializer(serializers.Serializer):
 
 class BaseImageSerializerField(serializers.Field):
     def to_internal_value(self, data):
-        try:
-            format_, imgstr = data.split(';base64,')
-            ext = format_.split('/')[-1]
-            return ContentFile(base64.b64decode(imgstr), name=f'{uuid.uuid4()}.{ext}')
-        except Exception:
-            raise serializers.ValidationError()
+        return base64_to_content_file(data)
 
 
 class RecipeCreateUpdateSerializer(serializers.ModelSerializer):
@@ -197,24 +186,6 @@ class RecipeShortSerializer(serializers.ModelSerializer):
         fields = ('id', 'name', 'image', 'cooking_time')
 
 
-class ShoppingCartSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = ShoppingCartRelation
-        fields = ['user', 'recipe']
-
-    def validate(self, data):
-        user = data['user']
-        recipe = data['recipe']
-        if ShoppingCartRelation.objects.filter(user=user, recipe=recipe).exists():
-            raise serializers.ValidationError('Рецепт уже добавлен в корзину.')
-        return data
-
-    def to_representation(self, instance):
-        return RecipeShortSerializer(
-            instance.recipe,
-            context={'request': self.context['request']}).data
-
-
 class SubscriptionSerializer(serializers.ModelSerializer):
     class Meta:
         model = Subscription
@@ -237,23 +208,6 @@ class SubscriptionSerializer(serializers.ModelSerializer):
                 raise ValidationError('Вы не подписаны на этого пользователя')
 
         return data
-
-
-class FavoriteRelationSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = FavoriteRelation
-        fields = ['user', 'recipe']
-
-    def validate(self, data):
-        user = data['user']
-        recipe = data['recipe']
-        if FavoriteRelation.objects.filter(user=user, recipe=recipe).exists():
-            raise serializers.ValidationError('Рецепт уже добавлен в избранное.')
-        return data
-
-    def to_representation(self, instance):
-        return RecipeShortSerializer(instance.recipe,
-                                     context={'request': self.context['request']}).data
 
 
 class SubscribedSerializer(serializers.ModelSerializer):
@@ -280,3 +234,47 @@ class SubscribedSerializer(serializers.ModelSerializer):
             limit = int(limit)
         recipes = obj.recipes.all()[:limit]
         return RecipeShortSerializer(recipes, many=True, context=self.context).data
+
+
+class BaseRelationSerializer(serializers.ModelSerializer):
+    """Базовый сериалайзер для связей user-recipe (избранное, корзина)."""
+
+    class Meta:
+        abstract = True
+        fields = ['user', 'recipe']
+
+    def validate(self, data):
+        user = data['user']
+        recipe = data['recipe']
+        model = self.Meta.model
+        if model.objects.filter(user=user, recipe=recipe).exists():
+            raise serializers.ValidationError(
+                f'Рецепт уже добавлен в {self.get_related_name()}.'
+            )
+        return data
+
+    def to_representation(self, instance):
+        return RecipeShortSerializer(
+            instance.recipe,
+            context={'request': self.context['request']}
+        ).data
+
+    def get_related_name(self):
+        """Возвращает строку для сообщения об ошибке (можно переопределить)."""
+        return "список"
+
+
+class FavoriteRelationSerializer(BaseRelationSerializer):
+    class Meta(BaseRelationSerializer.Meta):
+        model = FavoriteRelation
+
+    def get_related_name(self):
+        return "избранное"
+
+
+class ShoppingCartSerializer(BaseRelationSerializer):
+    class Meta(BaseRelationSerializer.Meta):
+        model = ShoppingCartRelation
+
+    def get_related_name(self):
+        return "корзину"
